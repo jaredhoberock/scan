@@ -95,7 +95,10 @@ void blockwise_inplace_small_inclusive_scan(RandomAccessIterator first, Size n, 
 
     __syncthreads();
 
-    first[threadIdx.x] = x;
+    if(threadIdx.x < n)
+    {
+      first[threadIdx.x] = x;
+    }
 
     __syncthreads();
   }
@@ -106,21 +109,23 @@ template<typename RandomAccessIterator, typename Size, typename BinaryFunction>
 inline __device__ 
 void blockwise_inplace_inclusive_scan(RandomAccessIterator first, Size n, BinaryFunction op)
 {
-  blockwise_inplace_small_inclusive_scan(first, min(blockDim.x, n), op);
-
-  RandomAccessIterator last = first + n;
-  for(first += blockDim.x; first < last; first += blockDim.x, n -= blockDim.x)
+  while(n >= blockDim.x)
   {
-    // sum the previous iteration's carry
-    if(threadIdx.x == 0)
+    blockwise_inplace_inclusive_scan(first, op);
+
+    n -= blockDim.x;
+    first += blockDim.x;
+    
+    // sum the carry
+    if(n > 0 && threadIdx.x == 0)
     {
       *first = op(*(first-1), *first);
     }
 
     __syncthreads();
-
-    blockwise_inplace_small_inclusive_scan(first, min(blockDim.x, n), op);
   }
+
+  blockwise_inplace_small_inclusive_scan(first, n, op);
 }
 
 
