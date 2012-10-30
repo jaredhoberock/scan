@@ -3,6 +3,56 @@
 #include <thrust/scan.h>
 #include <cassert>
 
+
+template<typename RandomAccessIterator, typename T, typename BinaryFunction>
+inline __device__
+void blockwise_inplace_exclusive_scan(RandomAccessIterator first, T init, BinaryFunction op)
+{
+  typename thrust::iterator_value<RandomAccessIterator>::type x = threadIdx.x ? first[threadIdx.x - 1] : init;
+
+  for(unsigned int offset = 2; offset < blockDim.x; offset *= 2)
+  {
+    if(threadIdx.x >= offset)
+    {
+      x = op(first[threadIdx.x - offset], x);
+    }
+
+    __syncthreads();
+
+    first[threadIdx.x] = x;
+
+    __syncthreads();
+  }
+}
+
+
+template<typename RandomAccessIterator, typename Size, typename T, typename BinaryFunction>
+inline __device__ 
+void blockwise_inplace_small_exclusive_scan(RandomAccessIterator first, Size n, T init, BinaryFunction op)
+{
+  typename thrust::iterator_value<RandomAccessIterator>::type x;
+
+  if(threadIdx.x - 1 < n)
+  {
+    x = threadIdx.x ? first[threadIdx.x - 1] : init;
+  }
+
+  for(Size offset = 2; offset < n; offset *= 2)
+  {
+    if(threadIdx.x >= offset)
+    {
+      x = op(first[threadIdx.x - offset], x);
+    }
+
+    __syncthreads();
+
+    first[threadIdx.x] = x;
+
+    __syncthreads();
+  }
+}
+
+
 template<typename RandomAccessIterator, typename BinaryFunction>
 inline __device__
 void blockwise_inplace_inclusive_scan(RandomAccessIterator first, BinaryFunction op)
